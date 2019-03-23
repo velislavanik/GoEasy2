@@ -1,6 +1,8 @@
 package bg.easy.demo1.goeasy;
 
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.net.Uri;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
@@ -32,16 +34,25 @@ public class MainActivity extends AppCompatActivity {
 
         wv1.setWebViewClient(new MyBrowser());
         loadPage(WV_URL);
-
     }
         public void loadPage(String url){
+        final String url2=url;
             if (DetectConnection.isInternetAvailable(this)) {
                 wv1.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
+                wv1.loadUrl(url2);
             } else {
                 wv1.getSettings().setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
+                wv1.loadUrl(url2);
+                AlertDialog alertDialog = new AlertDialog.Builder(MainActivity.this).create();
+                alertDialog.setTitle("Error");
+                alertDialog.setMessage("Check your internet connection and try again.");
+                alertDialog.setButton(DialogInterface.BUTTON_POSITIVE, "OK", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                       //Do nothing
+                    }
+                });
+                alertDialog.show();
             }
-           wv1.loadUrl(url);
-            // TO DO Syobshti na usera, 4e nmqa net
   }
 
     //Action on back key tap/click
