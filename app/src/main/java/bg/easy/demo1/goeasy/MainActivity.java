@@ -1,5 +1,6 @@
 package bg.easy.demo1.goeasy;
 
+import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.support.annotation.NonNull;
@@ -11,6 +12,9 @@ import android.view.KeyEvent;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 
+import java.io.File;
+import java.util.Objects;
+
 public class MainActivity extends AppCompatActivity {
 
     static ActionBar ab;
@@ -18,6 +22,7 @@ public class MainActivity extends AppCompatActivity {
     WebView wv1;
     private SwipeRefreshLayout swipe;
 
+    @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
 
@@ -26,17 +31,18 @@ public class MainActivity extends AppCompatActivity {
         ab = getSupportActionBar();
         wv1 = findViewById(R.id.webView);
         swipe = findViewById(R.id.swiperefresh);
-        getSupportActionBar().setTitle(R.string.bar_title);
+        Objects.requireNonNull(getSupportActionBar()).setTitle(R.string.bar_title);
         //Webview settings; defaults are customized for best performance
         WebSettings webSettings = wv1.getSettings();
         webSettings.setSupportZoom(true);
-        webSettings.setUseWideViewPort(true);
         webSettings.setDomStorageEnabled(true);
         webSettings.setJavaScriptEnabled(true);
+        webSettings.setUseWideViewPort(true);
+        webSettings.setLoadWithOverviewMode(true);
+        webSettings.setLayoutAlgorithm(WebSettings.LayoutAlgorithm.SINGLE_COLUMN);
+        webSettings.setAppCacheEnabled(true);
 
-        wv1.setWebViewClient(new MyBrowser()
-
-        );
+        wv1.setWebViewClient(new MyBrowser(this));
         loadPage(WV_URL);
 
         /*
@@ -47,8 +53,10 @@ public class MainActivity extends AppCompatActivity {
                 new SwipeRefreshLayout.OnRefreshListener() {
                     @Override
                     public void onRefresh() {
-
-                        loadPage(wv1.getUrl());
+                        if (wv1.getUrl().contains("error.html"))
+                            loadPage(MyBrowser.path);
+                        else
+                            loadPage(wv1.getUrl());
                         swipe.setRefreshing(false); //signal to stop the refreshing indicator
                     }
                 }
@@ -60,17 +68,31 @@ public class MainActivity extends AppCompatActivity {
             wv1.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
             wv1.loadUrl(url);
         } else {
-            wv1.getSettings().setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
-            wv1.loadUrl(url);
+            if (isCacheAvailable()) {
+                wv1.getSettings().setCacheMode(WebSettings.LOAD_CACHE_ONLY);
+                wv1.loadUrl(url);
+            } else {
+                wv1.loadUrl("file:///android_asset/error.html");
+            }
             AlertDialog alertDialog = new AlertDialog.Builder(MainActivity.this).create();
-            alertDialog.setTitle("Error");
-            alertDialog.setMessage("Check your internet connection and try again.");
+            alertDialog.setTitle("Connect to a Network");
+            alertDialog.setMessage("To use Ease, turn on mobile data or connect to Wi-Fi");
             alertDialog.setButton(DialogInterface.BUTTON_POSITIVE, "OK", new DialogInterface.OnClickListener() {
                 public void onClick(DialogInterface dialog, int which) {
-                    //Do nothing
+                    //
                 }
             });
             alertDialog.show();
+        }
+    }
+
+    //Check in if there is cahc at all
+    public boolean isCacheAvailable() {
+        File dir = getApplicationContext().getCacheDir();
+        if (dir.exists())
+            return dir.listFiles().length > 0;
+        else {
+            return false;
         }
     }
 
