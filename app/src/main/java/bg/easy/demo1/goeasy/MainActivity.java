@@ -9,6 +9,8 @@ import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.KeyEvent;
+import android.webkit.CookieManager;
+import android.webkit.CookieSyncManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 
@@ -41,54 +43,94 @@ public class MainActivity extends AppCompatActivity {
         webSettings.setLoadWithOverviewMode(true);
         webSettings.setLayoutAlgorithm(WebSettings.LayoutAlgorithm.SINGLE_COLUMN);
         webSettings.setAppCacheEnabled(true);
+        webSettings.setCacheMode(WebSettings.LOAD_DEFAULT);
 
-        wv1.setWebViewClient(new MyBrowser(this));
-        loadPage(WV_URL);
+        if (DetectConnection.isInternetAvailable(this)) {
+            wv1.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
+            wv1.loadUrl(WV_URL);
+        } else if (isCacheAvailable(wv1.getUrl())) {
+            wv1.getSettings().setCacheMode(WebSettings.LOAD_CACHE_ONLY);
+            wv1.loadUrl(WV_URL);
+
+        } else {
+            //no connection & no cache on onCreate
+            wv1.loadUrl("file:///android_asset/error.html");
+            wv1.clearCache(true);
+            CookieSyncManager.createInstance(this);
+            CookieManager cookieManager = CookieManager.getInstance();
+            cookieManager.removeAllCookie();
+        }
+        wv1.setWebViewClient(new MyBrowser() {
+
+            @Override
+            public void onReceivedError(final WebView webView, int errorCode, String description, final String failingUrl) {
+
+                try {
+                    webView.stopLoading();
+                } catch (Exception e) {
+                    //
+                }
+                if (isCacheAvailable(wv1.getUrl())) {
+                    if (DetectConnection.isInternetAvailable(MainActivity.this)) {
+                        wv1.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
+                    } else {
+                        wv1.getSettings().setCacheMode(WebSettings.LOAD_CACHE_ONLY);
+                        alert();
+                    }
+                }
+                super.onReceivedError(webView, errorCode, description, failingUrl);
+            }
+        });
 
         /*
          * Sets up a SwipeRefreshLayout.OnRefreshListener that is invoked when the user
          * performs a swipe-to-refresh gesture.
          */
+
         swipe.setOnRefreshListener(
                 new SwipeRefreshLayout.OnRefreshListener() {
                     @Override
                     public void onRefresh() {
-                        if (wv1.getUrl().contains("error.html"))
-                            loadPage(MyBrowser.path);
-                        else
-                            loadPage(wv1.getUrl());
-                        swipe.setRefreshing(false); //signal to stop the refreshing indicator
+                        if (DetectConnection.isInternetAvailable(getApplicationContext())) {
+                            wv1.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);             //+
+                            if (wv1.getUrl().contains("error.html")) {
+                                // WV_URL = "https:\\jysk.bg";
+                                // wv1.loadUrl(wv1.getUrl());
+                                wv1.clearCache(true);
+                                wv1.loadUrl(MyBrowser.path);
+
+                            } else {
+                                wv1.loadUrl(wv1.getUrl());
+
+                            }
+                            swipe.setRefreshing(false); //signal to stop the refreshing indicator
+
+                        } else {
+                            alert();
+                        }
+                        swipe.setRefreshing(false);//signal to stop the refreshing indicator
                     }
                 }
         );
     }
 
-    public void loadPage(String url) {
-        if (DetectConnection.isInternetAvailable(this)) {
-            wv1.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
-            wv1.loadUrl(url);
-        } else {
-            if (isCacheAvailable()) {
-                wv1.getSettings().setCacheMode(WebSettings.LOAD_CACHE_ONLY);
-                wv1.loadUrl(url);
-            } else {
-                wv1.loadUrl("file:///android_asset/error.html");
+    //shows No Internet  message
+    private void alert() {
+        AlertDialog alertDialog = new AlertDialog.Builder(MainActivity.this).create();
+        alertDialog.setTitle("Connect to a Network");
+        alertDialog.setMessage("To use Ease, turn on mobile data or connect to Wi-Fi.");
+        alertDialog.setButton(DialogInterface.BUTTON_POSITIVE, "OK", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int which) {
+                //
             }
-            AlertDialog alertDialog = new AlertDialog.Builder(MainActivity.this).create();
-            alertDialog.setTitle("Connect to a Network");
-            alertDialog.setMessage("To use Ease, turn on mobile data or connect to Wi-Fi");
-            alertDialog.setButton(DialogInterface.BUTTON_POSITIVE, "OK", new DialogInterface.OnClickListener() {
-                public void onClick(DialogInterface dialog, int which) {
-                    //
-                }
-            });
-            alertDialog.show();
-        }
+        });
+        alertDialog.show();
     }
 
-    //Check in if there is cahc at all
-    public boolean isCacheAvailable() {
+    //Check in if there is cache at all
+    public boolean isCacheAvailable(String url) {
         File dir = getApplicationContext().getCacheDir();
+
         if (dir.exists())
             return dir.listFiles().length > 0;
         else {
